@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
+const https = require('https');
+const fs = require('fs');
 
 const CONFIG = require("./config.js");
 const authentication = require("./auth.js");
@@ -16,6 +18,33 @@ const campaign = require("./campaign.js");
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+var privateKey = './private.key';
+var certificate = './server.crt';
+var useSSL = false;
+
+try {
+  if (fs.existsSync(privateKey) && fs.existsSync(certificate)){
+    privateKey = fs.readFileSync('./private.key','utf8');
+    certificate = fs.readFileSync('./server.crt','utf8');
+
+    useSSL = true;
+
+  }
+} catch(err) {
+  console.log(`Server key and certificate not found. Running proxy in normal mode.`);
+  useSSL = false;
+}
+
+// SSL Certificate information
+//const privateKey = fs.readFileSync('./private.key','utf8');
+//const certificate = fs.readFileSync('./server.crt','utf8');
+/*
+const credentials = {
+  key: privateKey,
+  cert: certificate,
+};
+*/
 
 /**
  * A simple ping to tell if the proxy is running
@@ -352,6 +381,25 @@ app.post("/proxy/campaigns", cors(), express.json(), (req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`DDB Proxy started on :${port}`);
-});
+//app.listen(port, () => {
+//  console.log(`DDB Proxy started on :${port}`);
+//});
+
+if (useSSL === true) {
+  
+  const credentials = {
+    key: privateKey,
+    cert: certificate,
+  };
+  
+  const httpsServer = https.createServer(credentials, app);
+
+  httpsServer.listen(port, () => {
+    console.log(`DDB Proxy with HTTPS Server running on port ${port}`);
+  });
+} else {
+  app.listen(port, () => {
+    console.log(`DDB Proxy started on :${port}`);
+  });
+}
+
